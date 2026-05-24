@@ -8,44 +8,101 @@ export function filterContext({
 
   finances,
 
-  history
+  history,
+
+  message
 
 }) {
 
-  const context = {};
+  const lower =
+    message.toLowerCase();
 
-  switch (semanticIntent.intent) {
+  const context = {
 
-    case "financial_analysis":
+    priority_domain: null,
 
-      context.finances = finances;
+    relevant_data: {},
 
-      break;
+    ignored_domains: []
 
-    case "schedule_analysis":
+  };
 
-      context.events = events;
-      context.tasks = tasks;
+  // =====================================
+  // TEMPORAL / SCHEDULE
+  // =====================================
 
-      break;
+  if (
 
-    case "decision":
+    lower.includes("academia") ||
+    lower.includes("cinema") ||
+    lower.includes("horário") ||
+    lower.includes("tempo") ||
+    lower.includes("agenda")
 
-      context.events = events;
-      context.tasks = tasks;
-      context.finances = finances;
+  ) {
 
-      break;
+    context.priority_domain =
+      "temporal";
 
-    default:
+    context.relevant_data.events =
+      events;
 
-      context.events = events;
-      context.tasks = tasks;
-      context.finances = finances;
+    context.relevant_data.tasks =
+      tasks;
+
+    context.ignored_domains.push(
+      "financial"
+    );
+
+    return context;
 
   }
 
-  context.history = history;
+  // =====================================
+  // FINANCIAL
+  // =====================================
+
+  if (
+
+    lower.includes("dinheiro") ||
+    lower.includes("saldo") ||
+    lower.includes("gasto") ||
+    lower.includes("comprar")
+
+  ) {
+
+    context.priority_domain =
+      "financial";
+
+    context.relevant_data.finances =
+      finances;
+
+    context.ignored_domains.push(
+      "temporal"
+    );
+
+    return context;
+
+  }
+
+  // =====================================
+  // DEFAULT
+  // =====================================
+
+  context.priority_domain =
+    "general";
+
+  context.relevant_data.events =
+    events;
+
+  context.relevant_data.tasks =
+    tasks;
+
+  context.relevant_data.finances =
+    finances;
+
+  context.relevant_data.history =
+    history;
 
   return context;
 
