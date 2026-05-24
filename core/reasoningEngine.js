@@ -1,26 +1,30 @@
 export function reasoningEngine({
 
   semanticIntent,
+
   filteredContext,
+
   temporal,
+
   constraints,
+
   webData
 
 }) {
 
   return {
 
-    intent: semanticIntent,
+    semanticIntent,
 
-    context: filteredContext,
+    filteredContext,
 
-    temporal_analysis: temporal,
+    temporal,
 
     constraints,
 
-    web_data: webData,
+    webData,
 
-    final_reasoning: {
+    final_decision: {
 
       viable:
         !constraints.blocked,
