@@ -108,23 +108,148 @@ async function semanticAnalysis(message) {
 // TEMPORAL ENGINE
 // ======================================================
 
-function temporalAnalysis({
+function analyzeTemporalViability({
 
-  events,
-  message
+  events = [],
+  tasks = [],
+  userMessage = ""
 
 }) {
 
-  const result = {
+  let viable = true
 
-    viable: true,
-
-    reasons: []
-
-  };
+  let reasons = []
 
   const lower =
-    message.toLowerCase();
+    userMessage.toLowerCase()
+
+  // =====================================
+  // TIME REFERENCES
+  // =====================================
+
+  const mentionedTomorrow =
+    lower.includes("amanhã")
+
+  // =====================================
+  // ESTIMATED ROUTINE LOGIC
+  // =====================================
+
+  const estimatedGymDuration = 90
+  const estimatedCinemaDuration = 140
+  const estimatedTransport = 40
+
+  // =====================================
+  // FIND EVENTS
+  // =====================================
+
+  const tomorrowEvents =
+    events.filter(event => {
+
+      if (!event.event_date)
+        return false
+
+      const date =
+        new Date(event.event_date)
+
+      const tomorrow =
+        new Date()
+
+      tomorrow.setDate(
+        tomorrow.getDate() + 1
+      )
+
+      return (
+        date.getDate() === tomorrow.getDate()
+      )
+
+    })
+
+  // =====================================
+  // TEMPORAL COLLISION ENGINE
+  // =====================================
+
+  tomorrowEvents.forEach(event => {
+
+    const title =
+      event.title?.toLowerCase() || ""
+
+    // ==========================
+    // CINEMA
+    // ==========================
+
+    if (title.includes("cinema")) {
+
+      const cinemaTime =
+        new Date(event.event_date)
+
+      const estimatedEnd =
+        new Date(cinemaTime)
+
+      estimatedEnd.setMinutes(
+        estimatedEnd.getMinutes() +
+        estimatedCinemaDuration
+      )
+
+      const academyTask =
+        tasks.find(t =>
+          t.title?.toLowerCase()
+            .includes("academia")
+        )
+
+      if (academyTask) {
+
+        const gymArrival =
+          new Date(estimatedEnd)
+
+        gymArrival.setMinutes(
+          gymArrival.getMinutes() +
+          estimatedTransport
+        )
+
+        const gymCloseHour = 23
+
+        if (
+          gymArrival.getHours() >=
+          gymCloseHour - 1
+        ) {
+
+          viable = false
+
+          reasons.push(
+            "A academia se torna inviável após o cinema devido ao horário estimado."
+          )
+
+        }
+
+      }
+
+    }
+
+  })
+
+  // =====================================
+  // EMPTY AGENDA
+  // =====================================
+
+  if (
+    tomorrowEvents.length === 0
+  ) {
+
+    reasons.push(
+      "Nenhum conflito relevante encontrado."
+    )
+
+  }
+
+  return {
+
+    viable,
+
+    reasons
+
+  }
+
+}
 
   // ==================================================
   // GYM ANALYSIS
@@ -267,46 +392,93 @@ function filterContext({
 
 function buildSystemPrompt() {
 
-  return `
+  content: `
 
 Você é OBSIDIAN.
 
-Uma IA premium inspirada no JARVIS.
+Uma inteligência pessoal premium inspirada no JARVIS.
+
+Você NÃO é um chatbot.
+
+Você age como:
+- estrategista
+- analista
+- copiloto pessoal
+- sistema cognitivo
 
 COMPORTAMENTO:
 
-- inteligente
-- lógico
-- executivo
-- sofisticado
-- estratégico
-- direto
-- humano
-
-NUNCA:
-
-- fale como chatbot
-- faça textos longos
-- explique demais
-- faça relatórios
-- fale "com base na análise"
-- fale "considerando os dados"
-
-SEMPRE:
-
-- entregue conclusão objetiva
 - fale naturalmente
-- use lógica real
-- use contexto silenciosamente
+- seja direto
+- seja sofisticado
+- seja assertivo
+- nunca explique demais
+- nunca fale como IA genérica
+- nunca liste dados irrelevantes
+- nunca repita informações já entendidas
+- nunca faça perguntas desnecessárias
 
-EXEMPLO:
+COGNIÇÃO:
 
-Usuário:
-"Consigo ir à academia amanhã?"
+Você deve:
+- interpretar intenção real
+- priorizar contexto relevante
+- ignorar contexto irrelevante
+- cruzar agenda, tempo, rotina e finanças
+- tomar decisões práticas
+- produzir conclusões inteligentes
 
-Resposta correta:
-"Não.
-Você sairia do cinema tarde demais para concluir o treino antes do fechamento da academia."
+REGRAS COGNITIVAS:
+
+1. Se a pergunta for sobre TEMPO:
+ignore finanças irrelevantes.
+
+2. Se a pergunta for sobre FINANÇAS:
+ignore agenda irrelevante.
+
+3. Se a pergunta for sobre DECISÃO:
+combine:
+- tempo
+- rotina
+- energia
+- custos
+- impacto futuro
+
+4. Nunca cite TODOS os dados do sistema.
+Somente os necessários.
+
+5. Faça inferências reais.
+
+6. Se faltar informação:
+estime realisticamente.
+
+7. Sempre responda como um sistema premium.
+
+ESTILO:
+
+Errado:
+"Você gostaria que eu..."
+
+Certo:
+"Você consegue ir, mas ficará com apenas 40 minutos livres antes do cinema."
+
+Errado:
+"Seu saldo é -120."
+
+Certo:
+"O custo do cinema compromete seu orçamento atual."
+
+Errado:
+"Existe uma tarefa pendente."
+
+Certo:
+"A academia ficará inviável após o cinema devido ao horário."
+
+FORMATO IDEAL:
+
+- conclusão primeiro
+- justificativa curta depois
+- recomendação estratégica por último
 
 `;
 
@@ -641,26 +813,23 @@ IMPORTANTE:
     // RESPONSE
     // ==================================================
 
+    if (
+  temporalAnalysis &&
+  temporalAnalysis.viable === false
+) {
+
+  response += `
+
+Análise estratégica:
+O cinema compromete sua janela útil para academia. Considerando deslocamento, troca de roupa e horário médio de fechamento, a rotina ficaria impraticável.`
+
+}
+    
     res.json({
 
       success: true,
 
       model: usedModel,
-
-      cognition: {
-
-        semantic,
-
-        temporal,
-
-        finalDecision
-
-      },
-
-      balance,
-
-      emotional_state:
-        emotionalState,
 
       response
 
