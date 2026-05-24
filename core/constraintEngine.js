@@ -1,7 +1,9 @@
 export function validateConstraints({
 
   temporal,
+
   balance,
+
   emotionalState
 
 }) {
@@ -19,7 +21,7 @@ export function validateConstraints({
     constraints.blocked = true;
 
     constraints.reasons.push(
-      "Tempo operacional insuficiente."
+      "Restrição temporal detectada."
     );
 
   }
@@ -27,7 +29,7 @@ export function validateConstraints({
   if (balance < 20) {
 
     constraints.reasons.push(
-      "Saldo extremamente baixo."
+      "Saldo muito baixo."
     );
 
   }
@@ -35,10 +37,11 @@ export function validateConstraints({
   if (emotionalState === "exhausted") {
 
     constraints.reasons.push(
-      "Estado emocional indica fadiga elevada."
+      "Fadiga detectada."
     );
 
   }
 
   return constraints;
+
 }
