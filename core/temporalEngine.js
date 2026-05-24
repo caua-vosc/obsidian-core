@@ -1,59 +1,99 @@
 export function temporalReasoning({
-
   events,
-
-  gymClosingHour = 23,
-
-  workoutMinutes = 75,
-
-  travelMinutes = 30
-
+  tasks,
+  userMessage
 }) {
 
   const result = {
-
     viable: true,
+    confidence: "high",
+    reasons: [],
+    suggested_window: null
+  }
 
-    reasoning: []
+  const lower =
+    userMessage.toLowerCase()
 
-  };
+  // =====================================
+  // ACADEMIA
+  // =====================================
 
-  if (!events || events.length === 0) {
+  const askingGym =
+    lower.includes("academia")
 
-    return result;
+  if (askingGym) {
+
+    // estimativas REAIS
+    const gymDuration = 90 // minutos
+    const transportBuffer = 40 // ida + volta
+
+    // academia fecha
+    const gymCloseHour = 23
+
+    // evento cinema
+    const cinemaEvent =
+      events.find(e =>
+        e.title?.toLowerCase().includes("cinema")
+      )
+
+    if (cinemaEvent?.event_date) {
+
+      const cinemaDate =
+        new Date(cinemaEvent.event_date)
+
+      // estimativa realista
+      const movieDuration = 130
+
+      const movieEnd =
+        new Date(
+          cinemaDate.getTime() +
+          movieDuration * 60000
+        )
+
+      const arrivalHome =
+        new Date(
+          movieEnd.getTime() +
+          40 * 60000
+        )
+
+      const latestPossibleGym =
+        new Date(
+          arrivalHome.getTime() +
+          gymDuration * 60000
+        )
+
+      const closeTime =
+        new Date(arrivalHome)
+
+      closeTime.setHours(
+        gymCloseHour,
+        0,
+        0,
+        0
+      )
+
+      // =====================================
+      // NÃO DÁ TEMPO
+      // =====================================
+
+      if (
+        latestPossibleGym > closeTime
+      ) {
+
+        result.viable = false
+
+        result.confidence = "high"
+
+        result.reasons.push(
+          "O treino terminaria após o horário de fechamento da academia."
+        )
+
+        return result
+      }
+
+    }
 
   }
 
-  const nextEvent = events[0];
-
-  if (!nextEvent.event_date) {
-
-    return result;
-
-  }
-
-  const eventDate =
-    new Date(nextEvent.event_date);
-
-  const eventEndHour =
-    eventDate.getHours() + 2;
-
-  const arrivalHour =
-    eventEndHour + (travelMinutes / 60);
-
-  const availableHours =
-    gymClosingHour - arrivalHour;
-
-  if (availableHours < (workoutMinutes / 60)) {
-
-    result.viable = false;
-
-    result.reasoning.push(
-      "Janela insuficiente para treino completo."
-    );
-
-  }
-
-  return result;
-
+  return result
 }
