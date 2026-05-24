@@ -25,21 +25,17 @@ const supabase = createClient(
 // ========================================
 
 const AI_MODELS = {
+
   free: [
-    "qwen/qwen-2.5-7b-instruct:free",
-    "google/gemma-2-9b-it:free",
-    "mistralai/mistral-7b-instruct:free",
-    "meta-llama/llama-3.1-8b-instruct:free"
+
+    "openai/gpt-4o-mini"
+
   ],
 
-  premium: [
-    "google/gemini-flash-1.5",
-    "anthropic/claude-3-haiku",
-    "openai/gpt-4o-mini"
-  ]
-};
+  premium: []
 
-const USE_PREMIUM = true;
+
+const USE_PREMIUM = false;
 
 const ALL_MODELS = USE_PREMIUM
   ? [...AI_MODELS.free, ...AI_MODELS.premium]
