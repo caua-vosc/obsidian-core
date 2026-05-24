@@ -96,6 +96,116 @@ app.get("/health", (req, res) => {
 
 });
 
+async function analyzeIntent(message) {
+
+  try {
+
+    const completion = await axios.post(
+
+      "https://api.groq.com/openai/v1/chat/completions",
+
+      {
+
+        model: "llama-3.1-8b-instant",
+
+        temperature: 0.1,
+
+        messages: [
+
+          {
+
+            role: "system",
+
+            content: `
+
+Você é um motor semântico de interpretação cognitiva.
+
+Sua função:
+analisar a intenção real do usuário.
+
+Responda APENAS em JSON.
+
+Estrutura obrigatória:
+
+{
+  "intent": "",
+  "domains": [],
+  "priority": "",
+  "requires_reasoning": true,
+  "requires_external_data": false,
+  "requires_temporal_analysis": false,
+  "requires_financial_analysis": false,
+  "requires_schedule_analysis": false,
+  "requires_emotional_analysis": false
+}
+
+Possíveis intents:
+- decision
+- schedule_analysis
+- financial_analysis
+- emotional_analysis
+- productivity
+- routine
+- planning
+- general
+
+`
+
+          },
+
+          {
+
+            role: "user",
+
+            content: message
+
+          }
+
+        ]
+
+      },
+
+      {
+
+        headers: {
+
+          Authorization:
+            `Bearer ${process.env.GROQ_API_KEY}`,
+
+          "Content-Type":
+            "application/json"
+
+        }
+
+      }
+
+    );
+
+    const text =
+      completion.data.choices[0].message.content;
+
+    return JSON.parse(text);
+
+  } catch (err) {
+
+    console.log(err);
+
+    return {
+
+      intent: "general",
+
+      domains: [],
+
+      priority: "medium",
+
+      requires_reasoning: true
+
+    };
+
+  }
+
+}
+
 // ======================================
 // CHAT
 // ======================================
@@ -301,6 +411,9 @@ app.post("/chat", async (req, res) => {
 
     const balance =
       totalIncome - totalExpenses;
+    
+    const semanticIntent =
+  await analyzeIntent(message);
 
     // ======================================
     // TASK ANALYSIS
@@ -368,6 +481,9 @@ ${JSON.stringify(history)}
 
 ANÁLISE COGNITIVA:
 ${JSON.stringify(decisionAnalysis, null, 2)}
+
+ANÁLISE SEMÂNTICA:
+${JSON.stringify(semanticIntent, null, 2)}
 
 USUÁRIO:
 ${message}
