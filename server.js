@@ -109,10 +109,23 @@ ${message}
 
     // OPENROUTER
 
+    const models = [
+  "openai/gpt-4o-mini",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "mistralai/mistral-7b-instruct:free",
+  "google/gemma-2-9b-it:free"
+];
+
+let response = null;
+
+for (const model of models) {
+
+  try {
+
     const completion = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "meta-llama/llama-3.3-70b-instruct:free",
+        model,
         messages: [
           {
             role: "system",
@@ -132,8 +145,24 @@ ${message}
       }
     );
 
-    const response =
+    response =
       completion.data.choices[0].message.content;
+
+    console.log(`Modelo utilizado: ${model}`);
+
+    break;
+
+  } catch (err) {
+
+    console.log(`Falha no modelo ${model}`);
+
+  }
+
+}
+
+if (!response) {
+  throw new Error("Nenhum modelo disponível.");
+}
 
     // SALVAR USER
 
