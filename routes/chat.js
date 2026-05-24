@@ -1,22 +1,45 @@
-import express from "express";
-import { createClient } from "@supabase/supabase-js";
+import express from "express"
+import axios from "axios"
 
-import { analyzeIntent } from "../core/intentEngine.js";
-import { filterContext } from "../core/contextEngine.js";
-import { temporalReasoning } from "../core/temporalEngine.js";
-import { validateConstraints } from "../core/constraintEngine.js";
-import { reasoningEngine } from "../core/reasoningEngine.js";
-import { buildSystemPrompt } from "../core/responseEngine.js";
-import { webSearch } from "../core/webSearchEngine.js";
+import { supabase } from "../lib/supabase.js"
 
-import { askMainModel } from "../providers/router.js";
+import { semanticIntentAnalysis }
+from "../core/semanticEngine.js"
 
-const router = express.Router();
+import { filterContext }
+from "../core/contextFilter.js"
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+import { temporalReasoning }
+from "../core/temporalEngine.js"
+
+import { buildSystemPrompt }
+from "../core/responseEngine.js"
+
+const router = express.Router()
+
+// =====================================
+// MODELOS
+// =====================================
+
+const MODELS = [
+
+  "llama-3.3-70b-versatile",
+
+  "qwen-qwq-32b",
+
+  "qwen-2.5-32b",
+
+  "llama-3.1-8b-instant",
+
+  "gemma2-9b-it",
+
+  "llama3-8b-8192"
+
+]
+
+// =====================================
+// CHAT
+// =====================================
 
 router.post("/", async (req, res) => {
 
@@ -25,56 +48,118 @@ router.post("/", async (req, res) => {
     const {
       user_id,
       message
-    } = req.body;
+    } = req.body
 
     // =====================================
-    // MEMORY
+    // LOAD HISTORY
     // =====================================
 
-    const { data: history } = await supabase
-      .from("messages")
-      .select("*")
-      .order("created_at", {
-        ascending: false
-      })
-      .limit(20);
+    const { data: history } =
+      await supabase
+        .from("messages")
+        .select("*")
+        .order("created_at", {
+          ascending: false
+        })
+        .limit(20)
 
     // =====================================
-    // TASKS
+    // LOAD TASKS
     // =====================================
 
-    const { data: tasks } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("user_id", user_id);
+    const { data: tasks } =
+      await supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", user_id)
 
     // =====================================
-    // EVENTS
+    // LOAD EVENTS
     // =====================================
 
-    const { data: events } = await supabase
-      .from("calendar_events")
-      .select("*")
-      .eq("user_id", user_id);
+    const { data: events } =
+      await supabase
+        .from("calendar_events")
+        .select("*")
+        .eq("user_id", user_id)
 
     // =====================================
-    // FINANCES
+    // LOAD FINANCES
     // =====================================
 
-    const { data: finances } = await supabase
-      .from("financial_transactions")
-      .select("*")
-      .eq("user_id", user_id);
+    const { data: finances } =
+      await supabase
+        .from("financial_transactions")
+        .select("*")
+        .eq("user_id", user_id)
 
     // =====================================
-    // SEMANTIC ANALYSIS
+    // BALANCE
+    // =====================================
+
+    let income = 0
+    let expenses = 0
+
+    finances?.forEach(item => {
+
+      if (item.type === "income") {
+        income += Number(item.amount)
+      }
+
+      if (item.type === "expense") {
+        expenses += Number(item.amount)
+      }
+
+    })
+
+    const balance =
+      income - expenses
+
+    // =====================================
+    // EMOTIONAL STATE
+    // =====================================
+
+    let emotionalState = "neutral"
+
+    const lower =
+      message.toLowerCase()
+
+    if (
+      lower.includes("triste") ||
+      lower.includes("desanimado")
+    ) {
+
+      emotionalState = "sad"
+
+    }
+
+    if (
+      lower.includes("ansioso") ||
+      lower.includes("preocupado")
+    ) {
+
+      emotionalState = "anxious"
+
+    }
+
+    if (
+      lower.includes("feliz") ||
+      lower.includes("motivado")
+    ) {
+
+      emotionalState = "happy"
+
+    }
+
+    // =====================================
+    // SEMANTIC INTENT
     // =====================================
 
     const semanticIntent =
-      await analyzeIntent(message);
+      await semanticIntentAnalysis(message)
 
     // =====================================
-    // CONTEXT FILTERING
+    // CONTEXT FILTER
     // =====================================
 
     const filteredContext =
@@ -83,12 +168,42 @@ router.post("/", async (req, res) => {
         semanticIntent,
 
         events,
-        tasks,
-        finances,
-        history,
-        message
 
-      });
+        tasks,
+
+        finances,
+
+        history
+
+      })
+
+    // =====================================
+    // CONSTRAINTS
+    // =====================================
+
+    const constraints = {
+
+      blocked: false,
+
+      reasons: []
+
+    }
+
+    if (
+      semanticIntent.requires_financial_analysis
+    ) {
+
+      if (balance <= 0) {
+
+        constraints.blocked = true
+
+        constraints.reasons.push(
+          "Saldo insuficiente."
+        )
+
+      }
+
+    }
 
     // =====================================
     // TEMPORAL ENGINE
@@ -99,170 +214,179 @@ router.post("/", async (req, res) => {
 
         events,
 
-        currentHour:
-          new Date().getHours()
+        tasks,
 
-      });
+        userMessage: message
+
+      })
 
     // =====================================
-    // FINANCIAL ANALYSIS
+    // WEB DATA
     // =====================================
 
-    let income = 0;
-    let expenses = 0;
+    let webData = null
 
-    finances?.forEach(item => {
+    // =====================================
+    // COGNITION
+    // =====================================
 
-      if (item.type === "income") {
-        income += Number(item.amount);
+    const cognition = {
+
+      semanticIntent,
+
+      filteredContext,
+
+      temporal,
+
+      constraints,
+
+      webData,
+
+      final_decision: {
+
+        viable:
+          temporal.viable &&
+          !constraints.blocked,
+
+        confidence: "high"
+
       }
-
-      if (item.type === "expense") {
-        expenses += Number(item.amount);
-      }
-
-    });
-
-    const balance =
-      income - expenses;
-
-    // =====================================
-    // EMOTIONAL STATE
-    // =====================================
-
-    let emotionalState = "neutral";
-
-    const lower =
-      message.toLowerCase();
-
-    if (
-      lower.includes("cansado") ||
-      lower.includes("exausto")
-    ) {
-
-      emotionalState = "exhausted";
-
-    }
-
-    if (
-      lower.includes("feliz") ||
-      lower.includes("animado")
-    ) {
-
-      emotionalState = "motivated";
 
     }
 
     // =====================================
-    // CONSTRAINT ENGINE
+    // USER PROMPT
     // =====================================
 
-    const constraints =
-      validateConstraints({
-
-        temporal,
-
-        balance,
-
-        emotionalState
-
-      });
-
-    // =====================================
-    // WEB INTELLIGENCE
-    // =====================================
-
-    const webData =
-      semanticIntent.requires_web_search
-
-      ? await webSearch(message)
-
-      : null;
-
-    // =====================================
-    // REASONING ENGINE
-    // =====================================
-
-    import { temporalReasoning }
-from "../core/temporalEngine.js"
-
-    const temporal =
-  temporalReasoning({
-
-    events,
-    tasks,
-    userMessage: message
-
-  })
-    
-    const cognition =
-      reasoningEngine({
-
-        semanticIntent,
-
-        filteredContext,
-
-        temporal,
-
-        constraints,
-
-        webData
-
-      });
-
-    // =====================================
-    // AI COMPLETION
-    // =====================================
-
-    const completion =
-      await askMainModel([
-
-        {
-
-          role: "system",
-
-          content: buildSystemPrompt()
-
-        },
-
-        {
-
-          role: "user",
-
-          content: `
+    const userPrompt = `
 
 USUÁRIO:
 ${message}
 
 DECISÃO FINAL:
-${JSON.stringify(cognition.final_decision)}
+${JSON.stringify(
+  cognition.final_decision
+)}
 
-CONTEXTO RELEVANTE:
-${JSON.stringify(filteredContext.relevant_data)}
+ANÁLISE TEMPORAL:
+${JSON.stringify(
+  temporal
+)}
 
 RESTRIÇÕES:
-${JSON.stringify(cognition.constraints)}
+${JSON.stringify(
+  constraints
+)}
 
-INSTRUÇÃO:
+CONTEXTO RELEVANTE:
+${JSON.stringify(
+  filteredContext.relevant_data
+)}
 
-Responda SOMENTE a intenção principal do usuário.
-
-Ignore completamente:
-- domínios irrelevantes
-- explicações longas
-- análises desnecessárias
-- recomendações genéricas
-
-Entregue apenas:
-- conclusão objetiva
-- decisão
-- resposta executiva
+RESPONDA:
+- de forma objetiva
+- sem explicar demais
+- sem parecer chatbot
+- sem relatar análise interna
 
 `
 
-        }
+    // =====================================
+    // MODEL ROUTER
+    // =====================================
 
-      ]);
+    let response = null
+    let usedModel = null
+
+    for (const model of MODELS) {
+
+      try {
+
+        const completion =
+          await axios.post(
+
+            "https://api.groq.com/openai/v1/chat/completions",
+
+            {
+
+              model,
+
+              temperature: 0.4,
+
+              max_tokens: 500,
+
+              messages: [
+
+                {
+
+                  role: "system",
+
+                  content:
+                    buildSystemPrompt()
+
+                },
+
+                {
+
+                  role: "user",
+
+                  content:
+                    userPrompt
+
+                }
+
+              ]
+
+            },
+
+            {
+
+              headers: {
+
+                Authorization:
+                  `Bearer ${process.env.GROQ_API_KEY}`,
+
+                "Content-Type":
+                  "application/json"
+
+              }
+
+            }
+
+          )
+
+        response =
+          completion
+            .data
+            .choices[0]
+            .message
+            .content
+
+        usedModel = model
+
+        break
+
+      } catch (err) {
+
+        console.log(
+          "MODEL FAILED:",
+          model
+        )
+
+      }
+
+    }
+
+    // =====================================
+    // FALLBACK
+    // =====================================
+
+    if (!response) {
+
+      response =
+        "Nenhum modelo conseguiu responder."
+
+    }
 
     // =====================================
     // SAVE USER MESSAGE
@@ -272,13 +396,11 @@ Entregue apenas:
       .from("messages")
       .insert({
 
-        user_id,
-
         role: "user",
 
         content: message
 
-      });
+      })
 
     // =====================================
     // SAVE AI MESSAGE
@@ -288,13 +410,11 @@ Entregue apenas:
       .from("messages")
       .insert({
 
-        user_id,
-
         role: "assistant",
 
-        content: completion.response
+        content: response
 
-      });
+      })
 
     // =====================================
     // RESPONSE
@@ -304,27 +424,20 @@ Entregue apenas:
 
       success: true,
 
-      model:
-        completion.model,
-
-      semantic_intent:
-        semanticIntent,
-
-      cognition,
+      model: usedModel,
 
       balance,
 
       emotional_state:
         emotionalState,
 
-      response:
-        completion.response
+      response
 
-    });
+    })
 
   } catch (error) {
 
-    console.log(error);
+    console.log(error)
 
     res.status(500).json({
 
@@ -332,10 +445,10 @@ Entregue apenas:
 
       error: error.message
 
-    });
+    })
 
   }
 
-});
+})
 
-export default router;
+export default router
