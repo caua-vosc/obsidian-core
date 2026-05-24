@@ -87,9 +87,15 @@ app.post("/chat", async (req, res) => {
 
       } catch (err) {
 
-        console.log(
-          err?.response?.data || err.message
-        );
+        console.log("ERRO OPENROUTER:");
+
+console.log(
+  JSON.stringify(
+    err?.response?.data || err.message,
+    null,
+    2
+  )
+);
 
       }
 
