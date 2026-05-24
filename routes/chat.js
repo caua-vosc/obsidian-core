@@ -1,10 +1,214 @@
 import express from "express";
+import { createClient } from "@supabase/supabase-js";
+
+import { analyzeIntent } from "../core/intentEngine.js";
+import { filterContext } from "../core/contextEngine.js";
+import { temporalReasoning } from "../core/temporalEngine.js";
+import { validateConstraints } from "../core/constraintEngine.js";
+import { reasoningEngine } from "../core/reasoningEngine.js";
+import { buildSystemPrompt } from "../core/responseEngine.js";
+import { webSearch } from "../core/webSearchEngine.js";
+
+import { askMainModel } from "../providers/router.js";
+
+const router = express.Router();
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+router.post("/", async (req, res) => {
+
+  try {
+
+    const {
+      user_id,
+      message
+    } = req.body;
+
+    // =====================================
+    // MEMORY
+    // =====================================
+
+    const { data: history } = await supabase
+      .from("messages")
+      .select("*")
+      .order("created_at", {
+        ascending: false
+      })
+      .limit(20);
+
+    // =====================================
+    // TASKS
+    // =====================================
+
+    const { data: tasks } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", user_id);
+
+    // =====================================
+    // EVENTS
+    // =====================================
+
+    const { data: events } = await supabase
+      .from("calendar_events")
+      .select("*")
+      .eq("user_id", user_id);
+
+    // =====================================
+    // FINANCES
+    // =====================================
+
+    const { data: finances } = await supabase
+      .from("financial_transactions")
+      .select("*")
+      .eq("user_id", user_id);
+
+    // =====================================
+    // SEMANTIC ANALYSIS
+    // =====================================
+
+    const semanticIntent =
+      await analyzeIntent(message);
+
+    // =====================================
+    // CONTEXT FILTERING
+    // =====================================
+
+    const filteredContext =
+      filterContext({
+
+        semanticIntent,
+
+        events,
+        tasks,
+        finances,
+        history
+
+      });
+
+    // =====================================
+    // TEMPORAL ENGINE
+    // =====================================
+
+    const temporal =
+      temporalReasoning({
+
+        events,
+
+        currentHour:
+          new Date().getHours()
+
+      });
+
+    // =====================================
+    // FINANCIAL ANALYSIS
+    // =====================================
+
+    let income = 0;
+    let expenses = 0;
+
+    finances?.forEach(item => {
+
+      if (item.type === "income") {
+        income += Number(item.amount);
+      }
+
+      if (item.type === "expense") {
+        expenses += Number(item.amount);
+      }
+
+    });
+
+    const balance =
+      income - expenses;
+
+    // =====================================
+    // EMOTIONAL STATE
+    // =====================================
+
+    let emotionalState = "neutral";
+
+    const lower =
+      message.toLowerCase();
+
+    if (
+      lower.includes("cansado") ||
+      lower.includes("exausto")
+    ) {
+
+      emotionalState = "exhausted";
+
+    }
+
+    if (
+      lower.includes("feliz") ||
+      lower.includes("animado")
+    ) {
+
+      emotionalState = "motivated";
+
+    }
+
+    // =====================================
+    // CONSTRAINT ENGINE
+    // =====================================
+
+    const constraints =
+      validateConstraints({
+
+        temporal,
+
+        balance,
+
+        emotionalState
+
+      });
+
+    // =====================================
+    // WEB INTELLIGENCE
+    // =====================================
+
+    const webData =
+      semanticIntent.requires_web_search
+
+      ? await webSearch(message)
+
+      : null;
+
+    // =====================================
+    // REASONING ENGINE
+    // =====================================
+
+    const cognition =
+      reasoningEngine({
+
+        semanticIntent,
+
+        filteredContext,
+
+        temporal,
+
+        constraints,
+
+        webData
+
+      });
+
+    // =====================================
+    // AI COMPLETION
+    // =====================================
+
+    const completion =
+      await askMainModel([
+
         {
 
           role: "system",
 
-          content:
-            buildSystemPrompt()
+          content: buildSystemPrompt()
 
         },
 
@@ -20,13 +224,18 @@ ${message}
 COGNIÇÃO:
 ${JSON.stringify(cognition, null, 2)}
 
+CONTEXTO:
+${JSON.stringify(filteredContext, null, 2)}
+
 `
 
         }
 
       ]);
 
-    // SAVE USER
+    // =====================================
+    // SAVE USER MESSAGE
+    // =====================================
 
     await supabase
       .from("messages")
@@ -40,7 +249,9 @@ ${JSON.stringify(cognition, null, 2)}
 
       });
 
-    // SAVE AI
+    // =====================================
+    // SAVE AI MESSAGE
+    // =====================================
 
     await supabase
       .from("messages")
@@ -54,6 +265,10 @@ ${JSON.stringify(cognition, null, 2)}
 
       });
 
+    // =====================================
+    // RESPONSE
+    // =====================================
+
     res.json({
 
       success: true,
@@ -66,12 +281,19 @@ ${JSON.stringify(cognition, null, 2)}
 
       cognition,
 
+      balance,
+
+      emotional_state:
+        emotionalState,
+
       response:
         completion.response
 
     });
 
   } catch (error) {
+
+    console.log(error);
 
     res.status(500).json({
 
