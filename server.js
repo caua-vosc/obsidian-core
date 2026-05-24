@@ -300,7 +300,6 @@ ${message}
 
                 role: "system",
 
-                content:
                  content: `
 
 Você é OBSIDIAN.
