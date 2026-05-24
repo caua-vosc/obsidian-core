@@ -23,14 +23,16 @@ export function temporalReasoning({
 
   if (askingGym) {
 
-    // estimativas REAIS
-    const gymDuration = 90 // minutos
-    const transportBuffer = 40 // ida + volta
+    // duração treino
+    const gymDuration = 90
+
+    // deslocamento total
+    const transportBuffer = 40
 
     // academia fecha
     const gymCloseHour = 23
 
-    // evento cinema
+    // procurar evento cinema
     const cinemaEvent =
       events.find(e =>
         e.title?.toLowerCase().includes("cinema")
@@ -41,27 +43,31 @@ export function temporalReasoning({
       const cinemaDate =
         new Date(cinemaEvent.event_date)
 
-      // estimativa realista
+      // duração média filme
       const movieDuration = 130
 
+      // fim do filme
       const movieEnd =
         new Date(
           cinemaDate.getTime() +
           movieDuration * 60000
         )
 
+      // chegada em casa
       const arrivalHome =
         new Date(
           movieEnd.getTime() +
-          40 * 60000
+          transportBuffer * 60000
         )
 
-      const latestPossibleGym =
+      // horário final treino
+      const endGym =
         new Date(
           arrivalHome.getTime() +
           gymDuration * 60000
         )
 
+      // fechamento academia
       const closeTime =
         new Date(arrivalHome)
 
@@ -73,22 +79,19 @@ export function temporalReasoning({
       )
 
       // =====================================
-      // NÃO DÁ TEMPO
+      // CONFLITO
       // =====================================
 
-      if (
-        latestPossibleGym > closeTime
-      ) {
+      if (endGym > closeTime) {
 
         result.viable = false
 
         result.confidence = "high"
 
         result.reasons.push(
-          "O treino terminaria após o horário de fechamento da academia."
+          "O treino terminaria após o fechamento da academia."
         )
 
-        return result
       }
 
     }
@@ -96,4 +99,5 @@ export function temporalReasoning({
   }
 
   return result
+
 }
