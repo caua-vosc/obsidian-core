@@ -100,6 +100,92 @@ app.get("/health", (req, res) => {
 // CHAT
 // ======================================
 
+function analyzeDecision(context) {
+
+  const analysis = {
+
+    schedule_conflict: false,
+
+    financial_risk: "low",
+
+    routine_impact: "low",
+
+    recommendation: "",
+
+    reasoning: []
+
+  }
+
+  // =================================
+  // FINANCIAL ANALYSIS
+  // =================================
+
+  const balance =
+    context.financial_balance || 0
+
+  if (balance <= 50) {
+
+    analysis.financial_risk = "high"
+
+    analysis.reasoning.push(
+      "Saldo insuficiente para despesas adicionais."
+    )
+
+  }
+
+  // =================================
+  // TASK ANALYSIS
+  // =================================
+
+  const pendingTasks =
+    context.pending_tasks || 0
+
+  if (pendingTasks >= 3) {
+
+    analysis.routine_impact = "medium"
+
+    analysis.reasoning.push(
+      "Existem múltiplas tarefas pendentes."
+    )
+
+  }
+
+  // =================================
+  // EVENT ANALYSIS
+  // =================================
+
+  const events =
+    context.events || []
+
+  if (events.length > 0) {
+
+    analysis.reasoning.push(
+      "Existem eventos agendados."
+    )
+
+  }
+
+  // =================================
+  // FINAL RECOMMENDATION
+  // =================================
+
+  if (
+    analysis.financial_risk === "high"
+  ) {
+
+    analysis.recommendation =
+      "Evitar gastos não essenciais."
+
+  } else {
+
+    analysis.recommendation =
+      "Atividade considerada viável."
+
+  }
+
+  return analysis
+}
+
 app.post("/chat", async (req, res) => {
 
   try {
@@ -215,6 +301,16 @@ app.post("/chat", async (req, res) => {
 
     const balance =
       totalIncome - totalExpenses;
+    const decisionAnalysis =
+  analyzeDecision({
+
+    financial_balance: balance,
+
+    pending_tasks: pendingTasks,
+
+    events
+
+  });
 
     // ======================================
     // TASK ANALYSIS
@@ -264,6 +360,9 @@ ${JSON.stringify(tasks)}
 
 HISTÓRICO:
 ${JSON.stringify(history)}
+
+ANÁLISE COGNITIVA:
+${JSON.stringify(decisionAnalysis, null, 2)}
 
 USUÁRIO:
 ${message}
