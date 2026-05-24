@@ -219,14 +219,32 @@ router.post("/", async (req, res) => {
 
           content: `
 
-MENSAGEM:
+USUÁRIO:
 ${message}
 
-COGNIÇÃO:
-${JSON.stringify(cognition, null, 2)}
+DECISÃO FINAL:
+${JSON.stringify(cognition.final_decision)}
 
-CONTEXTO:
-${JSON.stringify(filteredContext, null, 2)}
+CONTEXTO RELEVANTE:
+${JSON.stringify(filteredContext.relevant_data)}
+
+RESTRIÇÕES:
+${JSON.stringify(cognition.constraints)}
+
+INSTRUÇÃO:
+
+Responda SOMENTE a intenção principal do usuário.
+
+Ignore completamente:
+- domínios irrelevantes
+- explicações longas
+- análises desnecessárias
+- recomendações genéricas
+
+Entregue apenas:
+- conclusão objetiva
+- decisão
+- resposta executiva
 
 `
 
