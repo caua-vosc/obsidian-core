@@ -1,10 +1,12 @@
 export function temporalReasoning({
 
   events,
-  currentHour,
+
   gymClosingHour = 23,
-  estimatedTravelMinutes = 30,
-  workoutMinimumMinutes = 75
+
+  workoutMinutes = 75,
+
+  travelMinutes = 30
 
 }) {
 
@@ -12,41 +14,46 @@ export function temporalReasoning({
 
     viable: true,
 
-    reasoning: [],
-
-    estimated_free_window: 0
+    reasoning: []
 
   };
 
-  const activeEvent = events?.[0];
-
-  if (!activeEvent?.event_date) {
+  if (!events || events.length === 0) {
 
     return result;
 
   }
 
-  const eventDate = new Date(activeEvent.event_date);
+  const nextEvent = events[0];
 
-  const eventEndHour = eventDate.getHours() + 2;
+  if (!nextEvent.event_date) {
 
-  const estimatedArrival =
-    eventEndHour + (estimatedTravelMinutes / 60);
+    return result;
 
-  const remainingHours =
-    gymClosingHour - estimatedArrival;
+  }
 
-  result.estimated_free_window = remainingHours;
+  const eventDate =
+    new Date(nextEvent.event_date);
 
-  if (remainingHours < (workoutMinimumMinutes / 60)) {
+  const eventEndHour =
+    eventDate.getHours() + 2;
+
+  const arrivalHour =
+    eventEndHour + (travelMinutes / 60);
+
+  const availableHours =
+    gymClosingHour - arrivalHour;
+
+  if (availableHours < (workoutMinutes / 60)) {
 
     result.viable = false;
 
     result.reasoning.push(
-      "Janela operacional insuficiente para treino completo."
+      "Janela insuficiente para treino completo."
     );
 
   }
 
   return result;
+
 }
