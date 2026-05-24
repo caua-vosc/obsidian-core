@@ -10,29 +10,37 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// =======================
+// =================================
 // MODELS
-// =======================
+// =================================
 
-const AI_MODELS = [
-  "openai/gpt-4o-mini"
+const MODELS = [
+
+  "llama-3.3-70b-versatile",
+
+  "gemma2-9b-it"
+
 ];
 
-// =======================
+// =================================
 // ROOT
-// =======================
+// =================================
 
 app.get("/", (req, res) => {
 
   res.json({
-    status: "Obsidian Core Online"
+
+    status: "Obsidian Core Online",
+    provider: "Groq",
+    models: MODELS.length
+
   });
 
 });
 
-// =======================
+// =================================
 // CHAT
-// =======================
+// =================================
 
 app.post("/chat", async (req, res) => {
 
@@ -41,20 +49,29 @@ app.post("/chat", async (req, res) => {
     const { message } = req.body;
 
     let response = null;
+    let usedModel = null;
 
-    for (const model of AI_MODELS) {
+    for (const model of MODELS) {
 
       try {
 
+        console.log("Tentando:", model);
+
         const completion = await axios.post(
 
-          "https://openrouter.ai/api/v1/chat/completions",
+          "https://api.groq.com/openai/v1/chat/completions",
 
           {
 
             model,
 
             messages: [
+
+              {
+                role: "system",
+                content:
+                  "Você é Obsidian, uma IA pessoal inteligente."
+              },
 
               {
                 role: "user",
@@ -70,7 +87,7 @@ app.post("/chat", async (req, res) => {
             headers: {
 
               Authorization:
-                `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                `Bearer ${process.env.GROQ_API_KEY}`,
 
               "Content-Type": "application/json"
 
@@ -83,28 +100,31 @@ app.post("/chat", async (req, res) => {
         response =
           completion.data.choices[0].message.content;
 
+        usedModel = model;
+
         break;
 
       } catch (err) {
 
-        console.log("ERRO OPENROUTER:");
-
-console.log(
-  JSON.stringify(
-    err?.response?.data || err.message,
-    null,
-    2
-  )
-);
+        console.log(
+          err?.response?.data || err.message
+        );
 
       }
+
+    }
+
+    if (!response) {
+
+      response =
+        "Nenhum modelo respondeu.";
 
     }
 
     res.json({
 
       success: true,
-
+      model: usedModel,
       response
 
     });
@@ -116,7 +136,6 @@ console.log(
     res.status(500).json({
 
       success: false,
-
       error: error.message
 
     });
@@ -125,9 +144,9 @@ console.log(
 
 });
 
-// =======================
+// =================================
 // START
-// =======================
+// =================================
 
 const PORT = process.env.PORT || 3000;
 
