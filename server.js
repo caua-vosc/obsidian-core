@@ -663,13 +663,35 @@ app.post("/chat", async (req, res) => {
     // TEMPORAL
     // ==================================================
 
-    const temporal =
-      temporalAnalysis({
+    const semanticIntent =
+  await analyzeIntent(message)
 
-        events,
-        message
+const temporalAnalysis =
+  analyzeTemporalViability({
 
-      });
+    events,
+    tasks,
+    userMessage: message
+
+  })
+
+const cognition = {
+
+  semantic: semanticIntent,
+
+  temporal: temporalAnalysis,
+
+  finalDecision: {
+
+    viable:
+      temporalAnalysis.viable,
+
+    reasons:
+      temporalAnalysis.reasons
+
+  }
+
+}
 
     // ==================================================
     // FILTERED CONTEXT
