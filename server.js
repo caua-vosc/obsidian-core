@@ -187,6 +187,9 @@ ${message}
 
         console.log("Modelo falhou:", model);
 
+console.log(
+  err?.response?.data || err.message
+);
       }
 
     }
