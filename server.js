@@ -301,7 +301,19 @@ app.post("/chat", async (req, res) => {
 
     const balance =
       totalIncome - totalExpenses;
-    const decisionAnalysis =
+
+    // ======================================
+    // TASK ANALYSIS
+    // ======================================
+
+    const pendingTasks =
+  tasks?.filter(t => !t.completed)?.length || 0;
+
+// ======================================
+// DECISION ENGINE
+// ======================================
+
+const decisionAnalysis =
   analyzeDecision({
 
     financial_balance: balance,
@@ -311,13 +323,6 @@ app.post("/chat", async (req, res) => {
     events
 
   });
-
-    // ======================================
-    // TASK ANALYSIS
-    // ======================================
-
-    const pendingTasks =
-      tasks?.filter(t => !t.completed)?.length || 0;
 
     // ======================================
     // PROMPT
