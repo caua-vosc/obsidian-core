@@ -85,7 +85,8 @@ router.post("/", async (req, res) => {
         events,
         tasks,
         finances,
-        history
+        history,
+        message
 
       });
 
