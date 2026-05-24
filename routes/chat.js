@@ -183,6 +183,18 @@ router.post("/", async (req, res) => {
     // REASONING ENGINE
     // =====================================
 
+    import { temporalReasoning }
+from "../core/temporalEngine.js"
+
+    const temporal =
+  temporalReasoning({
+
+    events,
+    tasks,
+    userMessage: message
+
+  })
+    
     const cognition =
       reasoningEngine({
 
