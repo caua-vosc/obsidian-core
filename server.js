@@ -3,9 +3,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import chatRoute from "./routes/chat.js";
-import voiceRoute from "./routes/voice.js";
-import automationRoute from "./routes/automation.js";
-import whatsappRoute from "./routes/whatsapp.js";
 
 dotenv.config();
 
@@ -20,35 +17,28 @@ app.get("/", (req, res) => {
 
     status: "OBSIDIAN ONLINE",
 
-    cognition: "ACTIVE",
-
-    architecture: "COGNITIVE",
-
-    reasoning: true,
+    cognition: true,
 
     orchestration: true,
 
-    semantic_analysis: true,
+    semantic_reasoning: true,
 
-    web_intelligence: true,
+    temporal_reasoning: true,
 
-    temporal_reasoning: true
+    web_intelligence: true
 
   });
 
 });
 
 app.use("/chat", chatRoute);
-app.use("/voice", voiceRoute);
-app.use("/automation", automationRoute);
-app.use("/whatsapp", whatsappRoute);
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
 
   console.log("================================");
-  console.log("OBSIDIAN COGNITIVE CORE ONLINE");
+  console.log("OBSIDIAN ONLINE");
   console.log("================================");
 
 });
