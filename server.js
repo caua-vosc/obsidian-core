@@ -120,269 +120,319 @@ function analyzeTemporalViability({
 
   let reasons = []
 
-  const lower =
-    userMessage.toLowerCase()
+  let estimatedTimeline = []
 
   // =====================================
-  // TIME REFERENCES
+  // DYNAMIC ESTIMATION ENGINE
   // =====================================
 
-  const mentionedTomorrow =
-    lower.includes("amanhã")
+  function estimateDuration(text) {
 
-  // =====================================
-  // ESTIMATED ROUTINE LOGIC
-  // =====================================
+    const lower =
+      text.toLowerCase()
 
-  const estimatedGymDuration = 90
-  const estimatedCinemaDuration = 140
-  const estimatedTransport = 40
+    // =================================
+    // HEALTH
+    // =================================
 
-  // =====================================
-  // FIND EVENTS
-  // =====================================
+    if (
+      lower.includes("academia") ||
+      lower.includes("treino") ||
+      lower.includes("corrida")
+    ) {
 
-  const tomorrowEvents =
-    events.filter(event => {
+      return 90
 
-      if (!event.event_date)
-        return false
+    }
 
-      const date =
-        new Date(event.event_date)
-
-      const tomorrow =
-        new Date()
-
-      tomorrow.setDate(
-        tomorrow.getDate() + 1
-      )
-
-      return (
-        date.getDate() === tomorrow.getDate()
-      )
-
-    })
-
-  // =====================================
-  // TEMPORAL COLLISION ENGINE
-  // =====================================
-
-  tomorrowEvents.forEach(event => {
-
-    const title =
-      event.title?.toLowerCase() || ""
-
-    // ==========================
+    // =================================
     // CINEMA
-    // ==========================
+    // =================================
 
-    if (title.includes("cinema")) {
+    if (
+      lower.includes("cinema") ||
+      lower.includes("filme")
+    ) {
 
-      const cinemaTime =
-        new Date(event.event_date)
+      return 150
 
-      const estimatedEnd =
-        new Date(cinemaTime)
+    }
 
-      estimatedEnd.setMinutes(
-        estimatedEnd.getMinutes() +
-        estimatedCinemaDuration
+    // =================================
+    // WORK
+    // =================================
+
+    if (
+      lower.includes("trabalho") ||
+      lower.includes("reunião")
+    ) {
+
+      return 120
+
+    }
+
+    // =================================
+    // ESTUDO
+    // =================================
+
+    if (
+      lower.includes("estudo") ||
+      lower.includes("faculdade")
+    ) {
+
+      return 180
+
+    }
+
+    // =================================
+    // SOCIAL
+    // =================================
+
+    if (
+      lower.includes("jantar") ||
+      lower.includes("festa") ||
+      lower.includes("encontro")
+    ) {
+
+      return 180
+
+    }
+
+    // =================================
+    // DEFAULT AI ESTIMATION
+    // =================================
+
+    return 120
+
+  }
+
+  // =====================================
+  // PRIORITY ENGINE
+  // =====================================
+
+  function estimatePriority(text) {
+
+    const lower =
+      text.toLowerCase()
+
+    if (
+      lower.includes("trabalho") ||
+      lower.includes("médico") ||
+      lower.includes("consulta")
+    ) {
+
+      return "high"
+
+    }
+
+    if (
+      lower.includes("academia") ||
+      lower.includes("estudo")
+    ) {
+
+      return "medium"
+
+    }
+
+    return "low"
+
+  }
+
+  // =====================================
+  // BUILD TIMELINE
+  // =====================================
+
+  const allItems = [
+
+    ...events.map(event => ({
+
+      type: "event",
+
+      title:
+        event.title || "Evento",
+
+      datetime:
+        event.event_date,
+
+      duration:
+        estimateDuration(
+          event.title || ""
+        ),
+
+      priority:
+        estimatePriority(
+          event.title || ""
+        )
+
+    })),
+
+    ...tasks.map(task => ({
+
+      type: "task",
+
+      title:
+        task.title || "Tarefa",
+
+      datetime:
+        task.due_date,
+
+      duration:
+        estimateDuration(
+          task.title || ""
+        ),
+
+      priority:
+        estimatePriority(
+          task.title || ""
+        )
+
+    }))
+
+  ]
+
+  // =====================================
+  // REMOVE INVALID DATES
+  // =====================================
+
+  const validItems =
+    allItems.filter(
+      item => item.datetime
+    )
+
+  // =====================================
+  // SORT TIMELINE
+  // =====================================
+
+  validItems.sort((a, b) => {
+
+    return (
+      new Date(a.datetime) -
+      new Date(b.datetime)
+    )
+
+  })
+
+  // =====================================
+  // COLLISION DETECTION
+  // =====================================
+
+  for (
+    let i = 0;
+    i < validItems.length - 1;
+    i++
+  ) {
+
+    const current =
+      validItems[i]
+
+    const next =
+      validItems[i + 1]
+
+    const currentStart =
+      new Date(current.datetime)
+
+    const currentEnd =
+      new Date(currentStart)
+
+    currentEnd.setMinutes(
+      currentEnd.getMinutes() +
+      current.duration
+    )
+
+    const nextStart =
+      new Date(next.datetime)
+
+    // =================================
+    // TRANSPORT BUFFER
+    // =================================
+
+    currentEnd.setMinutes(
+      currentEnd.getMinutes() + 40
+    )
+
+    // =================================
+    // COLLISION
+    // =================================
+
+    if (currentEnd > nextStart) {
+
+      viable = false
+
+      reasons.push(
+
+        `${current.title} conflita com ${next.title}.`
+
       )
 
-      const academyTask =
-        tasks.find(t =>
-          t.title?.toLowerCase()
-            .includes("academia")
+      // =============================
+      // PRIORITY ANALYSIS
+      // =============================
+
+      if (
+        current.priority === "high"
+      ) {
+
+        reasons.push(
+
+          `${current.title} possui prioridade elevada.`
+
         )
-
-      if (academyTask) {
-
-        const gymArrival =
-          new Date(estimatedEnd)
-
-        gymArrival.setMinutes(
-          gymArrival.getMinutes() +
-          estimatedTransport
-        )
-
-        const gymCloseHour = 23
-
-        if (
-          gymArrival.getHours() >=
-          gymCloseHour - 1
-        ) {
-
-          viable = false
-
-          reasons.push(
-            "A academia se torna inviável após o cinema devido ao horário estimado."
-          )
-
-        }
 
       }
 
     }
 
-  })
+  }
 
   // =====================================
-  // EMPTY AGENDA
+  // EMPTY STATE
   // =====================================
 
-  if (
-    tomorrowEvents.length === 0
-  ) {
+  if (reasons.length === 0) {
 
     reasons.push(
-      "Nenhum conflito relevante encontrado."
+      "Nenhum conflito crítico encontrado."
     )
 
   }
+
+  // =====================================
+  // USER MESSAGE CONTEXT
+  // =====================================
+
+  const lower =
+    userMessage.toLowerCase()
+
+  if (
+    lower.includes("consigo") ||
+    lower.includes("dá tempo") ||
+    lower.includes("viável")
+  ) {
+
+    if (!viable) {
+
+      reasons.unshift(
+        "A rotina atual apresenta conflito temporal."
+      )
+
+    }
+
+  }
+
+  // =====================================
+  // RETURN
+  // =====================================
 
   return {
 
     viable,
 
-    reasons
+    reasons,
+
+    estimatedTimeline:
+      validItems
 
   }
-
-}
-
-  // ==================================================
-  // GYM ANALYSIS
-  // ==================================================
-
-  if (lower.includes("academia")) {
-
-    const cinemaEvent =
-      events.find(event =>
-        event.title?.toLowerCase().includes("cinema")
-      );
-
-    if (cinemaEvent?.event_date) {
-
-      const cinemaTime =
-        new Date(cinemaEvent.event_date);
-
-      // duração média cinema
-      const movieDuration = 130;
-
-      // deslocamento médio
-      const transport = 40;
-
-      // treino
-      const gymDuration = 90;
-
-      // academia fecha
-      const gymCloseHour = 23;
-
-      // fim cinema
-      const cinemaEnd =
-        new Date(
-          cinemaTime.getTime() +
-          movieDuration * 60000
-        );
-
-      // chegada
-      const arrival =
-        new Date(
-          cinemaEnd.getTime() +
-          transport * 60000
-        );
-
-      // fim academia
-      const gymEnd =
-        new Date(
-          arrival.getTime() +
-          gymDuration * 60000
-        );
-
-      const closeTime =
-        new Date(arrival);
-
-      closeTime.setHours(
-        gymCloseHour,
-        0,
-        0,
-        0
-      );
-
-      if (gymEnd > closeTime) {
-
-        result.viable = false;
-
-        result.reasons.push(
-          "Você chegaria tarde demais para concluir o treino."
-        );
-
-      }
-
-    }
-
-  }
-
-  return result;
-
-}
-
-// ======================================================
-// CONTEXT FILTER
-// ======================================================
-
-function filterContext({
-
-  semantic,
-
-  events,
-  tasks,
-  finances
-
-}) {
-
-  // ==================================================
-  // GYM
-  // ==================================================
-
-  if (semantic.intent === "gym") {
-
-    return {
-
-      events,
-
-      tasks
-
-    };
-
-  }
-
-  // ==================================================
-  // PURCHASE
-  // ==================================================
-
-  if (semantic.intent === "purchase") {
-
-    return {
-
-      finances
-
-    };
-
-  }
-
-  // ==================================================
-  // DEFAULT
-  // ==================================================
-
-  return {
-
-    events,
-    tasks,
-    finances
-
-  };
 
 }
 
