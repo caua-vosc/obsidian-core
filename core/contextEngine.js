@@ -1,17 +1,26 @@
 export function filterContext({
 
   semanticIntent,
+
   events,
+
   tasks,
+
   finances,
-  history,
-  behavior
+
+  history
 
 }) {
 
   const context = {};
 
   switch (semanticIntent.intent) {
+
+    case "financial_analysis":
+
+      context.finances = finances;
+
+      break;
 
     case "schedule_analysis":
 
@@ -20,25 +29,11 @@ export function filterContext({
 
       break;
 
-    case "financial_analysis":
-
-      context.finances = finances;
-
-      break;
-
     case "decision":
 
       context.events = events;
       context.tasks = tasks;
       context.finances = finances;
-      context.behavior = behavior;
-
-      break;
-
-    case "behavioral_analysis":
-
-      context.history = history;
-      context.behavior = behavior;
 
       break;
 
@@ -50,5 +45,8 @@ export function filterContext({
 
   }
 
+  context.history = history;
+
   return context;
+
 }
