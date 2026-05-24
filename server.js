@@ -476,31 +476,6 @@ app.post("/automation", async (req, res) => {
 const PORT =
   process.env.PORT || 3000;
 
-app.get("/debug", async (req, res) => {
-
-  const { data: tasks, error: tasksError } = await supabase
-    .from("tasks")
-    .select("*");
-
-  const { data: finances, error: financesError } = await supabase
-    .from("financial_transactions")
-    .select("*");
-
-  const { data: events, error: eventsError } = await supabase
-    .from("calendar_events")
-    .select("*");
-
-  res.json({
-    tasks,
-    finances,
-    events,
-    tasksError,
-    financesError,
-    eventsError
-  });
-
-});
-
 app.listen(PORT, () => {
 
   console.log("====================================");
