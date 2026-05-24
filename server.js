@@ -25,46 +25,19 @@ const supabase = createClient(
 // ========================================
 
 const AI_MODELS = {
-
-  // ======================
-  // FREE MODELS
-  // ======================
-
   free: [
-
     "qwen/qwen-2.5-7b-instruct:free",
-
     "google/gemma-2-9b-it:free",
-
     "mistralai/mistral-7b-instruct:free",
-
-    "meta-llama/llama-3.1-8b-instruct:free",
-
-    "deepseek/deepseek-chat:free"
-
+    "meta-llama/llama-3.1-8b-instruct:free"
   ],
 
-  // ======================
-  // PREMIUM MODELS
-  // ======================
-
   premium: [
-
     "google/gemini-flash-1.5",
-
     "anthropic/claude-3-haiku",
-
-    "openai/gpt-4o-mini",
-
-    "deepseek/deepseek-chat"
-
+    "openai/gpt-4o-mini"
   ]
-
 };
-
-// ========================================
-// CONFIG
-// ========================================
 
 const USE_PREMIUM = true;
 
@@ -73,18 +46,16 @@ const ALL_MODELS = USE_PREMIUM
   : AI_MODELS.free;
 
 // ========================================
-// STATUS
+// ROOT
 // ========================================
 
 app.get("/", (req, res) => {
-
   res.json({
     status: "Obsidian Core Online",
     ai_router: "active",
     premium_models: USE_PREMIUM,
     models_available: ALL_MODELS.length
   });
-
 });
 
 // ========================================
@@ -95,211 +66,111 @@ app.post("/chat", async (req, res) => {
 
   try {
 
-    const {
-      user_id,
-      message
-    } = req.body;
+    const { user_id, message } = req.body;
 
-    // ========================================
-    // LOAD HISTORY
-    // ========================================
+    // =========================
+    // LOAD DATA
+    // =========================
 
     const { data: history } = await supabase
       .from("messages")
       .select("*")
-      .order("created_at", { ascending: false })
       .limit(20);
-
-    // ========================================
-    // LOAD MEMORY
-    // ========================================
-
-    const { data: memories } = await supabase
-      .from("ai_memory")
-      .select("*")
-      .eq("user_id", user_id)
-      .order("importance", { ascending: false })
-      .limit(20);
-
-    // ========================================
-    // LOAD TASKS
-    // ========================================
 
     const { data: tasks } = await supabase
       .from("tasks")
       .select("*")
-      .eq("user_id", user_id)
-      .eq("completed", false);
-
-    // ========================================
-    // LOAD EVENTS
-    // ========================================
+      .eq("user_id", user_id);
 
     const { data: events } = await supabase
       .from("calendar_events")
       .select("*")
       .eq("user_id", user_id);
 
-    // ========================================
-    // LOAD FINANCES
-    // ========================================
-
     const { data: finances } = await supabase
       .from("financial_transactions")
       .select("*")
       .eq("user_id", user_id)
-      .limit(30);
+      .limit(20);
 
-    // ========================================
-    // FULL CONTEXT PROMPT
-    // ========================================
+    // =========================
+    // PROMPT
+    // =========================
 
     const prompt = `
-
 Você é Obsidian.
 
 Uma IA pessoal avançada.
 
 Você possui:
 - memória persistente
-- análise emocional
-- análise comportamental
-- contexto pessoal
-- tarefas
 - agenda
 - finanças
-- histórico do usuário
+- tarefas
+- contexto do usuário
 
 Seu objetivo:
 - ajudar o usuário
-- organizar sua vida
-- responder dúvidas
-- agir como copiloto pessoal
-- analisar padrões
-- identificar emoções
-- sugerir melhorias
-- ajudar em decisões importantes
-- lembrar compromissos
-- auxiliar produtividade
-
-Você deve:
 - responder naturalmente
-- responder como um humano inteligente
-- manter contexto
-- lembrar informações importantes
-- analisar humor do usuário
-- perceber sobrecarga mental
-- perceber procrastinação
-- perceber estresse
-- sugerir melhorias de rotina
+- analisar emoções
+- ajudar decisões
+- agir como copiloto pessoal
 
-========================================
-MEMÓRIAS
-========================================
-
-${JSON.stringify(memories)}
-
-========================================
-TAREFAS
-========================================
-
+TAREFAS:
 ${JSON.stringify(tasks)}
 
-========================================
-AGENDA
-========================================
-
+AGENDA:
 ${JSON.stringify(events)}
 
-========================================
-FINANÇAS
-========================================
-
+FINANÇAS:
 ${JSON.stringify(finances)}
 
-========================================
-HISTÓRICO
-========================================
-
+HISTÓRICO:
 ${JSON.stringify(history)}
 
-========================================
-USUÁRIO
-========================================
-
+USUÁRIO:
 ${message}
-
 `;
 
-    // ========================================
+    // =========================
     // AI ROUTER
-    // ========================================
+    // =========================
 
     let response = null;
-
     let usedModel = null;
-
     let modelType = null;
 
     for (const model of ALL_MODELS) {
 
       try {
 
-        console.log(`
-========================================
-TRYING MODEL
-${model}
-========================================
-`);
+        console.log("Tentando modelo:", model);
 
         const completion = await axios.post(
-
           "https://openrouter.ai/api/v1/chat/completions",
 
           {
             model,
 
             messages: [
-
               {
                 role: "system",
-
-                content: `
-Você é Obsidian.
-
-Uma IA pessoal avançada.
-
-Você deve:
-- agir como assistente pessoal
-- analisar emoções
-- ajudar em decisões
-- usar memória persistente
-- ajudar organização pessoal
-- responder naturalmente
-- agir de forma humana
-`
+                content: "Você é Obsidian, uma IA pessoal inteligente."
               },
 
               {
                 role: "user",
                 content: prompt
               }
-
             ]
-
           },
 
           {
             headers: {
-
-              Authorization:
-                \`Bearer ${process.env.OPENROUTER_API_KEY}\`,
-
+              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
               "Content-Type": "application/json"
-
             }
           }
-
         );
 
         response =
@@ -312,106 +183,69 @@ Você deve:
             ? "premium"
             : "free";
 
-        console.log(`
-========================================
-MODEL SUCCESS
-MODEL: ${model}
-TYPE: ${modelType}
-========================================
-`);
+        console.log("Modelo funcionando:", model);
 
         break;
 
       } catch (err) {
 
-        console.log(`
-========================================
-MODEL FAILED
-MODEL: ${model}
-========================================
-`);
+        console.log("Modelo falhou:", model);
 
       }
 
     }
 
-    // ========================================
-    // FALLBACK RESPONSE
-    // ========================================
+    // =========================
+    // FALLBACK
+    // =========================
 
     if (!response) {
 
-      response = `
-No momento alguns modelos estão indisponíveis.
-
-Mas a infraestrutura da Obsidian continua operacional.
-
-Tente novamente em alguns instantes.
-`;
+      response =
+        "Nenhum modelo disponível no momento.";
 
     }
 
-    // ========================================
+    // =========================
     // SAVE USER MESSAGE
-    // ========================================
+    // =========================
 
     await supabase
       .from("messages")
       .insert({
-
-        conversation_id: null,
-
         role: "user",
-
         content: message
-
       });
 
-    // ========================================
+    // =========================
     // SAVE AI RESPONSE
-    // ========================================
+    // =========================
 
     await supabase
       .from("messages")
       .insert({
-
-        conversation_id: null,
-
         role: "assistant",
-
         content: response
-
       });
 
-    // ========================================
+    // =========================
     // RESPONSE
-    // ========================================
+    // =========================
 
     res.json({
-
       success: true,
-
       provider_model: usedModel,
-
       provider_type: modelType,
-
       response
-
     });
 
   } catch (error) {
 
-    console.error(
-      error?.response?.data || error.message
-    );
+    console.error(error);
 
     res.status(500).json({
-
       success: false,
-
-      error:
-        error?.response?.data || error.message
-
+      error: error.message
     });
 
   }
@@ -426,13 +260,9 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
 
-  console.log(`
-
-========================================
-OBSIDIAN CORE ONLINE
-PORT: ${PORT}
-========================================
-
-`);
+  console.log("=================================");
+  console.log("OBSIDIAN CORE ONLINE");
+  console.log("PORT:", PORT);
+  console.log("=================================");
 
 });
