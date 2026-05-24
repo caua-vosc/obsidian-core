@@ -1,8 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
 
@@ -16,10 +16,6 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
-const genAI = new GoogleGenerativeAI(
-  process.env.GEMINI_API_KEY
-);
-
 app.get("/", (req, res) => {
   res.json({
     status: "Obsidian Core Online"
@@ -27,6 +23,7 @@ app.get("/", (req, res) => {
 });
 
 app.post("/chat", async (req, res) => {
+
   try {
 
     const {
@@ -34,7 +31,7 @@ app.post("/chat", async (req, res) => {
       message
     } = req.body;
 
-    // BUSCAR ÚLTIMAS MENSAGENS
+    // HISTÓRICO
 
     const { data: history } = await supabase
       .from("messages")
@@ -42,16 +39,15 @@ app.post("/chat", async (req, res) => {
       .order("created_at", { ascending: false })
       .limit(10);
 
-    // BUSCAR MEMÓRIA
+    // MEMÓRIAS
 
     const { data: memories } = await supabase
       .from("ai_memory")
       .select("*")
       .eq("user_id", user_id)
-      .order("importance", { ascending: false })
       .limit(10);
 
-    // BUSCAR TAREFAS
+    // TAREFAS
 
     const { data: tasks } = await supabase
       .from("tasks")
@@ -59,14 +55,14 @@ app.post("/chat", async (req, res) => {
       .eq("user_id", user_id)
       .eq("completed", false);
 
-    // BUSCAR EVENTOS
+    // EVENTOS
 
     const { data: events } = await supabase
       .from("calendar_events")
       .select("*")
       .eq("user_id", user_id);
 
-    // BUSCAR FINANÇAS
+    // FINANÇAS
 
     const { data: finances } = await supabase
       .from("financial_transactions")
@@ -74,23 +70,22 @@ app.post("/chat", async (req, res) => {
       .eq("user_id", user_id)
       .limit(20);
 
-    // CONTEXTO
+    // PROMPT CONTEXTUAL
 
     const prompt = `
-Você é Obsidian, uma IA pessoal contextual extremamente inteligente.
+Você é Obsidian, uma IA pessoal extremamente inteligente.
 
 Você possui:
 - memória persistente
 - acesso à agenda
-- acesso às finanças
 - acesso às tarefas
+- acesso às finanças
 - análise comportamental
 
 Seu objetivo:
-- ajudar o usuário
-- organizar sua vida
+- organizar a vida do usuário
 - responder dúvidas
-- sugerir melhorias
+- ajudar decisões
 - agir como copiloto pessoal
 
 MEMÓRIAS:
@@ -112,15 +107,35 @@ USUÁRIO:
 ${message}
 `;
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash"
-    });
+    // OPENROUTER
 
-    const result = await model.generateContent(prompt);
+    const completion = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "deepseek/deepseek-chat-v3-0324:free",
+        messages: [
+          {
+            role: "system",
+            content: "Você é Obsidian."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
 
-    const response = result.response.text();
+    const response =
+      completion.data.choices[0].message.content;
 
-    // SALVAR MENSAGEM USUÁRIO
+    // SALVAR USER
 
     await supabase
       .from("messages")
@@ -130,7 +145,7 @@ ${message}
         content: message
       });
 
-    // SALVAR RESPOSTA IA
+    // SALVAR IA
 
     await supabase
       .from("messages")
@@ -147,14 +162,15 @@ ${message}
 
   } catch (error) {
 
-    console.error(error);
+    console.error(error?.response?.data || error);
 
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error?.response?.data || error.message
     });
 
   }
+
 });
 
 const PORT = process.env.PORT || 3000;
