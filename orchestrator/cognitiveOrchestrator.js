@@ -20,7 +20,8 @@ export async function cognitiveOrchestrator({
   // MODEL SELECTION
   // =====================================
 
-  const model = selectModel(semantic);
+  const selectedModel =
+  selectModel(semantic);
 
   // =====================================
   // CONTEXT FILTERING
@@ -76,7 +77,7 @@ Seu objetivo é agir como um sistema operacional cognitivo pessoal.
 
   const response = await callGroq({
 
-    model,
+    model: selectedModel.model,
 
     temperature: 0.7,
 
@@ -110,7 +111,7 @@ ${JSON.stringify(semantic, null, 2)}
   return {
 
     semantic,
-    model,
+    model: selectedModel.model,
     response
 
   };
